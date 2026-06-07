@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>智能刀具履歷管理系統 - IE極致優化版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        #signature-canvas { touch-action: none; }
+        .active-tab { border-bottom: 3px solid #3b82f6; color: #3b82f6; font-weight: 700; }
+        @keyframes pulse-border { 0% { border-color: #3b82f6; } 50% { border-color: #93c5fd; } 100% { border-color: #3b82f6; } }
+        .scanning { animation: pulse-border 1.5s infinite; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- 頂部導航 -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-2">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2 rounded-lg text-white shadow-lg"><i data-lucide="wrench" class="w-6 h-6"></i></div>
+                <div>
+                    <h1 class="text-lg md:text-xl font-black tracking-wider flex items-center gap-2">智能刀具履歷系統</h1>
+                    <p class="text-[10px] text-slate-400 font-bold">現場防呆判定 ｜ 品管SPC統計 ｜ 權責分流追溯</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3 text-sm">
+                <div id="login-status-indicator" class="hidden flex items-center space-x-2 bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700">
+                    <span class="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                    <span id="display-user-name" class="font-medium text-slate-200">登入中</span>
+                </div>
+                <button id="logout-btn" onclick="handleSystemLogout()" class="hidden bg-red-600/20 hover:bg-red-600 hover:text-white text-red-400 px-3 py-1.5 rounded-lg border border-red-500/30 transition-all flex items-center gap-1 font-bold">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> 登出
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 登入 Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-slate-200">
+            <div class="bg-slate-900 p-8 text-white text-center relative overflow-hidden">
+                <div class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xl border-4 border-slate-800"><i data-lucide="shield-check" class="w-10 h-10 text-white"></i></div>
+                <h3 class="text-3xl font-black tracking-widest">佳茂再磨系統</h3>
+                <p class="text-sm text-slate-300 mt-2 font-medium">智能履歷管理 2.0</p>
+                <div class="mt-4 inline-block bg-slate-800 px-4 py-1.5 rounded-full border border-slate-700">
+                    <p class="text-xs text-yellow-400 font-bold tracking-widest flex items-center gap-1"><i data-lucide="code" class="w-3 h-3"></i> IE系統開發: 沈和進</p>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-500 via-teal-400 to-indigo-500"></div>
+            </div>
+            <div class="p-8 space-y-5">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">操作員姓名 (登錄者) <span class="text-red-500">*</span></label>
+                    <input type="text" id="login-username" class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 font-bold text-slate-800 shadow-inner" placeholder="請輸入您的姓名">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 mb-1">系統授權密碼 <span class="text-red-500">*</span></label>
+                    <input type="password" id="login-password" class="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-slate-50 font-bold text-slate-800 shadow-inner" placeholder="請輸入安全授權密碼">
+                </div>
+                <div id="login-error-msg" class="hidden p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm font-bold flex items-center gap-2 animate-bounce">
+                    <i data-lucide="alert-circle" class="w-5 h-5"></i> <span>姓名未填或密碼錯誤！</span>
+                </div>
+                <button onclick="attemptSystemLogin()" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-lg active:scale-95">
+                    <i data-lucide="unlock" class="w-5 h-5"></i> 解鎖進入系統
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要內容區 -->
+    <main id="main-content" class="flex-grow max-w-7xl mx-auto px-4 py-6 w-full space-y-6 filter blur-md pointer-events-none transition-all duration-500">
+
+        <!-- 頁籤切換 -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-2 flex space-x-1">
+            <button onclick="switchTab('import')" id="tab-import" class="flex-1 py-3 text-center rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 active-tab"><i data-lucide="camera" class="w-4 h-4"></i> 1. 上傳與AI辨識</button>
+            <button onclick="switchTab('database')" id="tab-database" class="flex-1 py-3 text-center rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"><i data-lucide="database" class="w-4 h-4"></i> 2. 刀具履歷資料庫</button>
+            <button onclick="switchTab('report')" id="tab-report" class="hidden flex-1 py-3 text-center rounded-lg text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all items-center justify-center gap-2 text-purple-700 bg-purple-50"><i data-lucide="bar-chart-3" class="w-4 h-4"></i> 3. 📊 管理者圖表</button>
+        </div>
+
+        <!-- 🎯 看板數據 -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-6 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full mix-blend-multiply filter blur-2xl opacity-70 transform translate-x-1/2 -translate-y-1/2"></div>
+            <div class="border-b border-slate-100 pb-4 flex justify-between items-center flex-wrap gap-2 relative z-10">
+                <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <span class="p-1.5 bg-blue-600 text-white rounded-lg shadow-md"><i data-lucide="bar-chart-2" class="w-5 h-5"></i></span>
+                    今日生產與耗損精算 <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full">(上午10點結算制)</span>
+                </h2>
+                <div class="flex items-center gap-2">
+                    <button onclick="forceRefreshDashboard()" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 transition-colors shadow-sm border border-blue-200 active:scale-95">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i> 強制雲端同步
+                    </button>
+                    <span id="today-date-str" class="text-sm bg-slate-800 text-white px-4 py-1.5 rounded-full font-bold shadow-md"></span>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 lg:grid-cols-6 gap-4 relative z-10">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-center mb-1"><span class="text-xs md:text-sm font-bold text-slate-500">今日回來刀子總數</span></div>
+                    <div><span id="kb-total" class="text-2xl md:text-3xl font-black text-slate-800">...</span><span class="text-xs text-slate-400 ml-1 font-bold">隻</span></div>
+                </div>
+                <div class="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-200 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-center mb-1"><span class="text-xs md:text-sm font-bold text-green-700">綠燈再磨 (OK)</span></div>
+                    <div><span id="kb-ok" class="text-2xl md:text-3xl font-black text-green-600">...</span><span class="text-xs text-green-600 ml-1 font-bold">隻</span></div>
+                </div>
+                <div class="bg-gradient-to-br from-red-50 to-rose-50 p-4 rounded-xl border border-red-200 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-center mb-1"><span class="text-xs md:text-sm font-bold text-red-700">紅燈退修 (NG)</span></div>
+                    <div><span id="kb-ng" class="text-2xl md:text-3xl font-black text-red-600">...</span><span class="text-xs text-red-600 ml-1 font-bold">隻</span></div>
+                </div>
+                <div class="bg-gradient-to-br from-indigo-50 to-blue-50 p-4 rounded-xl border border-indigo-200 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-center mb-1"><span class="text-xs md:text-sm font-bold text-indigo-700">生產良率 (Yield)</span></div>
+                    <div><span id="kb-yield" class="text-2xl md:text-3xl font-black text-indigo-600">...</span></div>
+                </div>
+                <div class="bg-gradient-to-br from-teal-50 to-emerald-50 p-4 rounded-xl border border-teal-200 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-center mb-1"><span class="text-xs md:text-sm font-bold text-teal-700">預估創造產值</span></div>
+                    <div><span class="text-sm font-bold text-teal-600">NT$</span> <span id="kb-profit" class="text-2xl md:text-3xl font-black text-teal-600">...</span></div>
+                </div>
+                <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-xl border border-amber-200 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex justify-between items-center mb-1"><span class="text-xs md:text-sm font-bold text-amber-700">退修損失成本</span></div>
+                    <div><span class="text-sm font-bold text-amber-600">NT$</span> <span id="kb-cost" class="text-2xl md:text-3xl font-black text-amber-600">...</span></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 上傳辨識區 -->
+        <section id="view-import" class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div id="upload-zone" class="border-2 border-dashed border-slate-300 rounded-2xl p-8 flex flex-col items-center justify-center text-center space-y-5 bg-slate-50 transition-colors">
+                        <div class="bg-blue-100 p-4 rounded-full text-blue-600 mb-2"><i data-lucide="scan-line" class="w-8 h-8"></i></div>
+                        <div>
+                            <p class="text-base font-black text-slate-700">使用相機拍照 ｜ 或選擇相簿照片</p>
+                            <p class="text-xs text-slate-500 font-bold mt-1">系統已導入邊緣壓縮技術，相機照片直接可用</p>
+                        </div>
+                        <div class="flex gap-3 w-full justify-center">
+                            <input type="file" id="image-camera-input" accept="image/*" capture="environment" class="sr-only">
+                            <label for="image-camera-input" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg flex items-center gap-2 transition-transform active:scale-95">
+                                <i data-lucide="camera" class="w-5 h-5"></i> 開啟相機
+                            </label>
+
+                            <input type="file" id="image-upload-input" accept="image/*" class="sr-only">
+                            <label for="image-upload-input" class="cursor-pointer bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-6 rounded-xl shadow-lg flex items-center gap-2 transition-transform active:scale-95">
+                                <i data-lucide="image" class="w-5 h-5"></i> 選擇相簿
+                            </label>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200 flex flex-col justify-center shadow-inner relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-blue-200">
+                            <div id="loading-bar" class="h-full bg-blue-600 w-0 transition-all duration-300"></div>
+                        </div>
+                        <h3 class="text-sm font-black text-slate-700 mb-3 flex items-center gap-2"><i data-lucide="cpu" class="w-4 h-4 text-blue-600"></i> AI 解析狀態監控</h3>
+                        <div id="ocr-status-box" class="p-4 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-600 shadow-sm">
+                            <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-green-500"></div> 系統待命中，等待接收影像指令...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="preview-section" class="hidden space-y-4 mt-6 pt-6 border-t border-slate-200">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-black text-slate-900 flex items-center gap-2 text-lg"><i data-lucide="clipboard-check" class="w-6 h-6 text-green-600"></i> 特徵提取確認清單</h4>
+                    </div>
+                    <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
+                        <table class="w-full text-sm border-collapse">
+                            <thead class="bg-slate-100 border-b border-slate-200">
+                                <tr>
+                                    <th class="p-4 text-center font-black text-slate-700 w-16">序號</th>
+                                    <th class="p-4 text-left font-black text-slate-700">雷雕刀號</th>
+                                    <th class="p-4 text-left font-black text-slate-700">拉削數量 (防呆判定)</th>
+                                    <th class="p-4 text-center font-black text-slate-700 w-20">刪除</th>
+                                </tr>
+                            </thead>
+                            <tbody id="preview-table-body" class="divide-y divide-slate-100 bg-white"></tbody>
+                        </table>
+                    </div>
+                    <div class="flex gap-4 pt-4">
+                        <button onclick="addNewRowToPreview()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors"><i data-lucide="plus-circle" class="w-5 h-5"></i> 手動新增資料</button>
+                        <button onclick="executeJudgment()" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-black py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg transition-transform active:scale-95 text-lg"><i data-lucide="check-square" class="w-5 h-5"></i> 確認並提交判定</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 資料庫區 -->
+        <section id="view-database" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5">
+                <div class="border-b border-slate-100 pb-4 flex justify-between items-center">
+                    <h3 class="text-xl font-black text-slate-900 flex items-center gap-2">
+                        <span class="p-2 bg-blue-600 text-white rounded-lg shadow-md"><i data-lucide="database" class="w-5 h-5"></i></span> 刀具履歷資料庫
+                    </h3>
+                    <span class="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">包含歷史紀錄</span>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="relative">
+                        <i data-lucide="search" class="w-5 h-5 absolute left-3 top-3 text-slate-400"></i>
+                        <input type="text" id="search-tool-input" class="w-full border border-slate-300 rounded-xl pl-10 p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 bg-slate-50" placeholder="輸入刀號快速搜尋...">
+                    </div>
+                    <select id="filter-status-input" class="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 bg-slate-50">
+                        <option value="">📋 顯示全部判定狀態</option>
+                        <option value="再磨">🟢 僅顯示 再磨 (OK)</option>
+                        <option value="退修">🔴 僅顯示 退修 (NG)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead class="bg-slate-800 text-white border-b border-slate-200">
+                            <tr>
+                                <th class="p-3 text-center font-bold w-12">No.</th>
+                                <th class="p-3 text-left font-bold">生產日期</th>
+                                <th class="p-3 text-left font-bold text-yellow-300">刀號與歷史狀態</th>
+                                <th class="p-3 text-left font-bold">拉削數量</th>
+                                <th class="p-3 text-left font-bold">研磨人</th>
+                                <th class="p-3 text-left font-bold">判定狀態</th>
+                                <th class="p-3 text-left font-bold">處理與簽核</th>
+                                <th class="p-3 text-left font-bold text-emerald-300">系統登錄者</th>
+                                <th class="p-3 text-left font-bold text-gray-300">備註(空白)</th>
+                                <th class="p-3 text-left font-bold text-blue-300 border-l border-slate-600">登記確認(手簽)</th>
+                                <th class="p-3 text-center font-bold">管理</th>
+                            </tr>
+                        </thead>
+                        <tbody id="db-table-body" class="divide-y divide-slate-200 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 📊 第三個頁籤：主管專屬 SPC 分析長方圖 -->
+        <section id="view-report" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-5 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-32 h-32 bg-purple-50 rounded-full mix-blend-multiply filter blur-2xl opacity-70 transform translate-x-1/2 -translate-y-1/2 pointer-events-none"></div>
+                
+                <div class="flex justify-between items-center border-b border-slate-100 pb-4 relative z-10">
+                    <h3 class="text-xl font-black text-slate-900 flex items-center gap-2">
+                        <span class="p-2 bg-purple-600 text-white rounded-lg shadow-md"><i data-lucide="trending-up" class="w-5 h-5"></i></span> 人員退修不良(柏拉圖分析)
+                    </h3>
+                    <select id="chart-timeframe" onchange="updateAdminChart()" class="border border-slate-300 rounded-xl p-2 text-sm font-bold focus:ring-2 focus:ring-purple-500 bg-slate-50 shadow-sm cursor-pointer">
+                        <option value="7">近 7 天 (週報)</option>
+                        <option value="30" selected>近 30 天 (月報)</option>
+                        <option value="all">歷史全廠總計</option>
+                    </select>
+                </div>
+                
+                <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-wrap gap-4 text-sm font-bold text-slate-700 relative z-10 shadow-inner">
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 bg-red-500 rounded-sm"></div> 長方圖：該人員的退修(NG)總支數</div>
+                    <div class="flex items-center gap-2"><div class="w-3 h-3 bg-blue-500 rounded-full"></div> 折線：佔全廠總退修量的不良佔比(%)</div>
+                    <div class="w-full text-xs text-slate-500 font-medium mt-1">* 提示：本圖表自動屏除「正常(OK)」無須指定研磨人的資料，專注分析退修肇因與人員績效。</div>
+                </div>
+
+                <div class="relative h-[400px] w-full border border-slate-100 rounded-xl p-2 relative z-10">
+                    <canvas id="spcChart"></canvas>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 紅燈退修單 Modal -->
+    <div id="repair-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all border border-slate-200">
+            <div class="bg-red-600 p-5 text-white flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-lg"><i data-lucide="alert-triangle" class="w-6 h-6"></i></div>
+                <div>
+                    <h3 class="text-xl font-black tracking-wide">異常退修單 (NG 判定)</h3>
+                    <p class="text-xs text-red-100 mt-1 font-medium">防呆機制觸發：拉削數量不足標準，已啟動異常追溯流程</p>
+                </div>
+            </div>
+            <div class="p-6 space-y-5">
+                <div class="grid grid-cols-2 gap-4 bg-red-50 p-4 rounded-xl border border-red-100">
+                    <div><label class="block text-xs font-bold text-slate-500 mb-1">發生異常刀號</label><input type="text" id="repair-tool-id" readonly class="w-full border-0 bg-transparent text-lg font-black text-slate-800 focus:ring-0 p-0"></div>
+                    <div><label class="block text-xs font-bold text-slate-500 mb-1">登記數量</label><input type="number" id="repair-quantity" readonly class="w-full border-0 bg-transparent text-lg font-black text-red-600 focus:ring-0 p-0"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">前次研磨人 (溯源) <span class="text-red-500">*</span></label>
+                        <select id="repair-grinder" class="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-red-500 bg-slate-50 shadow-sm">
+                            <option value="">-- 必選：請選擇師傅 --</option>
+                            <option value="鄭國欽">鄭國欽</option>
+                            <option value="裴廷山">裴廷山</option>
+                            <option value="高春豪">高春豪</option>
+                            <option value="黎仲俊">黎仲俊</option>
+                            <option value="李耕偉">李耕偉</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">異常選項 <span class="text-red-500">*</span></label>
+                        <select id="repair-reason" class="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-red-500 bg-slate-50 shadow-sm">
+                            <option value="">-- 必選：請選擇原因 --</option>
+                            <option value="大徑NOGO入">大徑NOGO入</option>
+                            <option value="大徑GO不入">大徑GO不入</option>
+                            <option value="B-NOGO入">B-NOGO入</option>
+                            <option value="B-GO不入">B-GO不入</option>
+                            <option value="齒型偏差">齒型偏差</option>
+                            <option value="其它原因">其它原因</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 管理者專用區域 -->
+                <div id="repair-extra-fields" class="space-y-4 border-t border-slate-200 pt-5 mt-2">
+                    <div class="inline-block bg-blue-100 text-blue-700 px-3 py-1 rounded-md text-xs font-bold mb-1"><i data-lucide="shield" class="w-3 h-3 inline"></i> 主管權限區塊</div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-2">處理方式及對策紀錄</label>
+                        <input type="text" id="repair-notes" class="w-full border border-slate-300 rounded-xl p-3 text-sm font-bold focus:ring-2 focus:ring-blue-500 bg-white" placeholder="請輸入處理對策">
+                    </div>
+                    <div class="relative">
+                        <label class="block text-sm font-bold text-slate-700 mb-2">主管核准親筆簽名 <span class="text-red-500">*</span></label>
+                        <canvas id="signature-canvas" class="w-full border-2 border-dashed border-slate-300 rounded-xl bg-slate-50" style="height: 140px; cursor: crosshair;"></canvas>
+                        <div id="signature-placeholder" class="absolute inset-0 flex items-center justify-center text-slate-400 font-bold pointer-events-none pt-8">請在此處簽名</div>
+                        <button onclick="clearSignature()" class="absolute bottom-2 right-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-3 py-1 rounded-lg font-bold">清除重簽</button>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-slate-100 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+                <button onclick="closeRepairModal()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-6 rounded-xl transition-colors">取消退出</button>
+                <button onclick="submitRepairForm()" class="bg-red-600 hover:bg-red-700 text-white font-black py-2.5 px-8 rounded-xl shadow-lg transition-transform active:scale-95 text-lg">確認送出並繼續</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自訂刪除警告 Modal -->
+    <div id="custom-confirm-modal" class="hidden fixed inset-0 bg-slate-950/80 flex items-center justify-center p-4 z-[60]">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-slate-200">
+            <div class="flex items-center gap-3 mb-4 text-red-600 bg-red-50 p-3 rounded-lg">
+                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                <h3 class="font-black text-lg">資料刪除警告</h3>
+            </div>
+            <p class="text-sm text-slate-600 mb-6 font-bold">確定要刪除此筆刀具履歷紀錄嗎？<br><span class="text-red-500">此動作將破壞生產追溯性，且無法復原。</span></p>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeConfirmModal()" class="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 rounded-xl font-bold text-slate-700 transition">取消</button>
+                <button id="confirm-delete-btn" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold shadow-md transition">確定強制刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🌟 主管專用：編輯修改 Modal -->
+    <div id="edit-modal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-slate-200">
+            <div class="bg-blue-600 p-5 text-white flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-lg"><i data-lucide="edit-3" class="w-6 h-6"></i></div>
+                <div>
+                    <h3 class="text-xl font-black tracking-wide">主管權限：修改履歷資料</h3>
+                    <p class="text-xs text-blue-100 mt-1 font-medium">資料修正將同步覆蓋更新本地與雲端</p>
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div><label class="block text-sm font-bold text-slate-700 mb-1">修改刀號</label><input type="text" id="edit-tool-id" class="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 bg-slate-50 font-bold text-slate-800"></div>
+                <div><label class="block text-sm font-bold text-slate-700 mb-1">修改數量</label><input type="number" id="edit-quantity" class="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 bg-slate-50 font-bold text-slate-800"></div>
+                <div><label class="block text-sm font-bold text-slate-700 mb-1">研磨人</label><input type="text" id="edit-grinder" class="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 bg-slate-50 font-bold text-slate-800" placeholder="若無指定請留白"></div>
+                <div><label class="block text-sm font-bold text-slate-700 mb-1">備註/對策修正</label><input type="text" id="edit-notes" class="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 bg-slate-50 font-bold text-slate-800"></div>
+            </div>
+            <div class="bg-slate-100 px-6 py-4 flex justify-end gap-3 border-t border-slate-200">
+                <button onclick="closeEditModal()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold py-2.5 px-6 rounded-xl transition-colors">取消退出</button>
+                <button onclick="submitEditRecord()" class="bg-blue-600 hover:bg-blue-700 text-white font-black py-2.5 px-8 rounded-xl shadow-lg transition-transform active:scale-95 text-lg">確認儲存並同步</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-[70] space-y-2 flex flex-col items-center pointer-events-none w-full max-w-md px-4"></div>
+
+    <script>
+        // =====================================================================
+        // 🌟 系統自訂參數設定區
+        // =====================================================================
+        const CONFIG = {
+            PROFIT_PER_OK: 800,   
+            LOSS_PER_NG: 1500,    
+            NG_THRESHOLD: 99,     
+            ADMIN_PWD: "8888",    
+            USER_PWD: "6666",     
+            GAS_URL: "https://script.google.com/macros/s/AKfycbwgcyEMrMVCeFIb8Pw70vjxHZIvqwMfzokK-OyHDBxIxYgmzkk3q0-WzzimYKW-p3CaeQ/exec",
+            GEMINI_API_KEY: "AIzaSyA0yH38YG5NNxZ1jsanZ5DKFfqtFBvVtaE"
+        };
+        // =====================================================================
+        
+        const apiKey = typeof __app_id !== 'undefined' ? "" : CONFIG.GEMINI_API_KEY; 
+        const LOCAL_DB_KEY = "tool_records_db_ie_v12"; 
+        var currentRole = ""; 
+        var loggedInUserName = ""; 
+        var recordsData = []; 
+        var tempPreviewData = [];
+        var sigCanvas, sigCtx, isDrawing = false, hasSigned = false;
+        var recordIdToDelete = null;
+        var spcChartInstance = null; 
+
+        // 🎯 IE 防呆優化：極度嚴謹的日期時區錨定，解決跨設備少一天的問題
+        function normalizeDate(d) {
+            if (!d) return "";
+            if (d instanceof Date) return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+            var dStr = String(d).trim();
+            if (!dStr) return "";
+
+            // 確保含有 T 或 Z 的 ISO 格式能轉換成本地時間再切取，防止時區造成差一天
+            if (dStr.includes('T') || dStr.includes('Z')) {
+                var dt = new Date(dStr);
+                if (!isNaN(dt.getTime())) return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, '0') + "-" + String(dt.getDate()).padStart(2, '0');
+            }
+
+            // 強制正則比對，避免不同廠牌手機瀏覽器自作聰明跨日
+            var ymdMatch = dStr.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+            if (ymdMatch) return ymdMatch[1] + "-" + String(ymdMatch[2]).padStart(2, '0') + "-" + String(ymdMatch[3]).padStart(2, '0');
+
+            var dt2 = new Date(dStr);
+            if (!isNaN(dt2.getTime())) return dt2.getFullYear() + "-" + String(dt2.getMonth() + 1).padStart(2, '0') + "-" + String(dt2.getDate()).padStart(2, '0');
+            return dStr;
+        }
+
+        // 🌟 上午 10 點結算制
+        function getProductionDate() {
+            var now = new Date();
+            if (now.getHours() < 10) { now.setDate(now.getDate() - 1); }
+            return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, '0') + "-" + String(now.getDate()).padStart(2, '0');
+        }
+
+        // 🌟 排序引擎：強制把 NG 退修置頂 
+        function sortRecordsData(data) {
+            return data.sort(function(a, b) {
+                var dateA = new Date(normalizeDate(a.date)).getTime() || 0;
+                var dateB = new Date(normalizeDate(b.date)).getTime() || 0;
+                if (dateA !== dateB) return dateB - dateA;
+                
+                var isNgA = (a.判定 === '退修' || a.判定 === 'NG' || a.判定 === '異常' || (a.quantity !== "" && parseInt(a.quantity) <= CONFIG.NG_THRESHOLD));
+                var isNgB = (b.判定 === '退修' || b.判定 === 'NG' || b.判定 === '異常' || (b.quantity !== "" && parseInt(b.quantity) <= CONFIG.NG_THRESHOLD));
+                
+                if (isNgA && !isNgB) return -1; 
+                if (!isNgA && isNgB) return 1;  
+                return 0; 
+            });
+        }
+
+        window.onload = function() {
+            try { recordsData = JSON.parse(localStorage.getItem(LOCAL_DB_KEY)) || []; } catch(e) { recordsData = []; }
+            var savedSession = localStorage.getItem("tool_login_session_v1");
+            
+            if(savedSession) {
+                try {
+                    var sessionObj = JSON.parse(savedSession);
+                    loggedInUserName = sessionObj.name;
+                    currentRole = sessionObj.role;
+                    
+                    document.getElementById('login-modal').classList.add('hidden');
+                    document.getElementById('main-content').classList.remove('blur-md', 'pointer-events-none');
+                    document.getElementById('login-status-indicator').classList.remove('hidden');
+                    document.getElementById('logout-btn').classList.remove('hidden');
+                    document.getElementById('display-user-name').innerText = (currentRole==="admin"?"主管: ":"操作員: ") + loggedInUserName;
+                    
+                    if (currentRole === "admin") {
+                        document.getElementById('tab-report').classList.remove('hidden');
+                        document.getElementById('tab-report').classList.add('flex');
+                    }
+                    
+                    // 登入時強制開啟同步載入鎖定
+                    backgroundCloudSync(false);
+                } catch(e) {}
+            } else {
+                updateDashboardUI(false);
+            }
+
+            try { lucide.createIcons(); } catch(e) {}
+            var inputs = ['image-upload-input', 'image-camera-input'];
+            inputs.forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) { el.addEventListener('click', function(e) { e.target.value = null; }); el.addEventListener('change', handleImageUploadEvent); }
+            });
+            document.getElementById('search-tool-input').addEventListener('keyup', renderTableUI);
+            document.getElementById('filter-status-input').addEventListener('change', renderTableUI);
+            var passInput = document.getElementById('login-password');
+            if (passInput) passInput.onkeypress = function(e) { if(e.key === 'Enter') attemptSystemLogin(); };
+            
+            initSignaturePad();
+            setInterval(function(){ if(currentRole) updateDashboardUI(false); }, 60000); 
+        };
+
+        function attemptSystemLogin() {
+            var name = document.getElementById('login-username').value.trim();
+            var pwd = document.getElementById('login-password').value.trim();
+            if(!name || (pwd !== CONFIG.USER_PWD && pwd !== CONFIG.ADMIN_PWD)) { document.getElementById('login-error-msg').classList.remove('hidden'); return; }
+            
+            loggedInUserName = name; 
+            currentRole = pwd === CONFIG.ADMIN_PWD ? "admin" : "user";
+            localStorage.setItem("tool_login_session_v1", JSON.stringify({name: loggedInUserName, role: currentRole}));
+            
+            document.getElementById('login-modal').classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(function() { document.getElementById('login-modal').classList.add('hidden'); }, 300);
+            document.getElementById('main-content').classList.remove('blur-md', 'pointer-events-none');
+            document.getElementById('login-status-indicator').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.remove('hidden');
+            document.getElementById('display-user-name').innerText = (currentRole==="admin"?"主管: ":"操作員: ") + name;
+            
+            if (currentRole === "admin") { document.getElementById('tab-report').classList.remove('hidden'); document.getElementById('tab-report').classList.add('flex'); } 
+            else { document.getElementById('tab-report').classList.add('hidden'); document.getElementById('tab-report').classList.remove('flex'); }
+            
+            showToast("系統登入成功，已為您記憶身分！", "success");
+            backgroundCloudSync(true); // 登入立刻抓雲端並鎖定看板
+        }
+
+        function switchTab(tabId) {
+            ['import', 'database', 'report'].forEach(function(t) {
+                var view = document.getElementById('view-' + t); var tab = document.getElementById('tab-' + t);
+                if(view) view.classList.add('hidden');
+                if(tab) { tab.classList.remove('border-b-[3px]', 'border-blue-600', 'text-blue-600', 'active-tab'); tab.classList.add('text-slate-500'); }
+            });
+            document.getElementById('view-' + tabId).classList.remove('hidden');
+            var actTab = document.getElementById('tab-' + tabId);
+            actTab.classList.remove('text-slate-500'); actTab.classList.add('border-b-[3px]', 'border-blue-600', 'text-blue-600', 'active-tab');
+            if(tabId === 'report') updateAdminChart(); 
+        }
+
+        // 📊 繪製管理者專用 SPC 柏拉圖 (Pareto Chart)
+        function updateAdminChart() {
+            if(currentRole !== "admin") return;
+            const timeframe = document.getElementById('chart-timeframe').value;
+            const now = new Date();
+            let totalTools = 0, totalNG = 0;
+            const ngCounts = {};
+
+            recordsData.forEach(r => {
+                const rDate = new Date(normalizeDate(r.date));
+                const diffDays = Math.ceil(Math.abs(now - rDate) / (1000 * 60 * 60 * 24));
+                if (timeframe !== 'all' && diffDays > parseInt(timeframe)) return;
+
+                totalTools++;
+                if (r.判定 === '退修' || r.判定 === 'NG' || (r.quantity !== "" && parseInt(r.quantity) <= CONFIG.NG_THRESHOLD)) {
+                    totalNG++;
+                    const grinder = (r.研磨人 && r.研磨人 !== '-' && r.研磨人 !== '系統判定(OK)') ? r.研磨人 : '未指定師傅';
+                    ngCounts[grinder] = (ngCounts[grinder] || 0) + 1;
+                }
+            });
+
+            const sortedGrinders = Object.keys(ngCounts).sort((a, b) => ngCounts[b] - ngCounts[a]);
+            const barData = sortedGrinders.map(g => ngCounts[g]);
+            const lineData = sortedGrinders.map(g => ((ngCounts[g] / totalNG) * 100).toFixed(1));
+
+            const ctx = document.getElementById('spcChart').getContext('2d');
+            if(spcChartInstance) spcChartInstance.destroy(); 
+
+            spcChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedGrinders,
+                    datasets: [
+                        { type: 'bar', label: '退修數量 (支)', data: barData, backgroundColor: 'rgba(239, 68, 68, 0.8)', borderColor: 'rgb(220, 38, 38)', borderWidth: 1, yAxisID: 'y', borderRadius: 4 },
+                        { type: 'line', label: '個人不良佔全廠比 (%)', data: lineData, borderColor: 'rgb(59, 130, 246)', backgroundColor: 'rgba(59, 130, 246, 0.5)', borderWidth: 3, marker: true, pointRadius: 5, pointBackgroundColor: 'white', yAxisID: 'y1' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { title: { display: true, text: `該期間全廠總不良率: ${totalTools > 0 ? ((totalNG/totalTools)*100).toFixed(1) : 0}% (退修 ${totalNG} 支 / 總共 ${totalTools} 支)`, font: { size: 16, weight: 'bold', family: "'Noto Sans TC', sans-serif" }, padding: { top: 10, bottom: 20 } }, tooltip: { titleFont: { family: "'Noto Sans TC', sans-serif" }, bodyFont: { family: "'Noto Sans TC', sans-serif" } } },
+                    scales: {
+                        x: { ticks: { font: { family: "'Noto Sans TC', sans-serif", weight: 'bold' } } },
+                        y: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: '退修總次數 (支)', font: { weight: 'bold' } }, ticks: { stepSize: 1 } },
+                        y1: { type: 'linear', position: 'right', beginAtZero: true, max: 100, title: { display: true, text: '不良佔比 (%)', font: { weight: 'bold' } }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        // 🚨 雲端資料解析與覆寫防呆 (確保主管修改能覆蓋，又不吃掉合法重複資料)
+        function mergeCloudData(cloudData) {
+            var cloudDict = {};
+            
+            // 利用 [刀號+日期] 作為唯一鍵值。主管修改時，新的一行會覆蓋舊的一行
+            cloudData.forEach(function(c) {
+                c.date = normalizeDate(c.date || c['生產日期'] || c.Date || c.Timestamp || c.timestamp || "");
+                c.tool_id = (c.tool_id || c['刀號'] || c.Tool_ID || "").toString().trim();
+                if (!c.date || !c.tool_id) return; 
+
+                c.quantity = parseInt(String(c.quantity || c['數量'] || c['拉削數量'] || "0").replace(/,/g, '')) || 0;
+                c.研磨人 = c.研磨人 || c.grinder || c['研磨人'] || "-";
+
+                var rawStatus = c.判定 || c.status || c['判定狀態'] || c['異常'] || "-";
+                if(rawStatus.includes("退修") || rawStatus.includes("NG") || c.quantity <= CONFIG.NG_THRESHOLD) c.判定 = "退修";
+                else if(rawStatus.includes("再磨") || rawStatus.includes("OK") || rawStatus.includes("正常")) c.判定 = "再磨";
+                else c.判定 = rawStatus;
+
+                c.退修原因 = c.退修原因 || c.reason || c['退修原因'] || "-";
+                c.處理人簽名 = c.處理人簽名 || c.signature || c['處理與簽核'] || c['處理人員'] || "-";
+                c.其他紀錄 = c.其他紀錄 || c.notes || c['備註'] || "-";
+                c.備註 = c.備註 || c['備註(空白)'] || "";
+                c.operator = c.operator || c['系統登錄者'] || "-";
+                
+                c.id = Date.now() + Math.random();
+
+                var uniqueKey = c.tool_id + "_" + c.date;
+                cloudDict[uniqueKey] = c; 
+            });
+
+            var merged = [];
+            recordsData.forEach(function(lr) {
+                var localKey = (lr.tool_id || "").trim() + "_" + normalizeDate(lr.date);
+                if (cloudDict[localKey]) {
+                    var cloudRecord = cloudDict[localKey];
+                    cloudRecord.id = lr.id;
+                    merged.push(cloudRecord);
+                    delete cloudDict[localKey]; 
+                } else {
+                    merged.push(lr);
+                }
+            });
+
+            Object.keys(cloudDict).forEach(function(key) {
+                merged.push(cloudDict[key]);
+            });
+
+            return sortRecordsData(merged);
+        }
+
+        function backgroundCloudSync(showMessages) {
+            if(!CONFIG.GAS_URL) {
+                updateDashboardUI(false); return;
+            }
+            if(showMessages) showToast("🔄 正在為您強制校對全廠最新數據...", "info");
+            
+            // 🌟 IE防呆視覺鎖定：同步期間讓看板顯示 ... 避免因為網路差產生 0 的視覺錯亂
+            updateDashboardUI(true); 
+            
+            var urlWithTimestamp = CONFIG.GAS_URL + (CONFIG.GAS_URL.includes('?') ? '&' : '?') + "action=import&t=" + new Date().getTime();
+            
+            fetch(urlWithTimestamp, { method: 'GET' })
+                .then(function(r) { return r.text(); })
+                .then(function(textResponse) {
+                    if (textResponse.indexOf('<html') === -1) {
+                        var d = JSON.parse(textResponse);
+                        if(d && Array.isArray(d) && d.length > 0) { 
+                            recordsData = mergeCloudData(d);
+                            localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(recordsData)); 
+                            
+                            updateDashboardUI(false); // 解除鎖定並顯示真實數據
+                            renderTableUI();
+                            if(currentRole === "admin") updateAdminChart(); 
+                            if(showMessages) showToast("✅ 最新看板數據已強制同步覆蓋完成！", "success");
+                        } else {
+                            updateDashboardUI(false);
+                        }
+                    } else {
+                        updateDashboardUI(false);
+                    }
+                }).catch(function(err) {
+                    console.log("雲端離線，目前使用本地暫存");
+                    updateDashboardUI(false);
+                });
+        }
+
+        function forceRefreshDashboard() {
+            showToast("🔄 正在重新載入並與雲端對接...", "info");
+            try { 
+                var localData = JSON.parse(localStorage.getItem(LOCAL_DB_KEY));
+                if (localData) recordsData = sortRecordsData(localData);
+            } catch(e) {}
+            backgroundCloudSync(false); // 直接觸發背景大同步
+        }
+
+        function handleSystemLogout() { 
+            localStorage.removeItem("tool_login_session_v1");
+            window.location.reload(); 
+        }
+
+        // 🌟 IE 優化：支援 Loading 防呆的 MECE 互斥計算 (100%確保總數正確)
+        function updateDashboardUI(isSyncing = false) {
+            var targetDate = getProductionDate(); 
+            document.getElementById('today-date-str').innerText = targetDate + " 統計區間";
+
+            if (isSyncing) {
+                document.getElementById('kb-total').innerText = "...";
+                document.getElementById('kb-ok').innerText = "...";
+                document.getElementById('kb-ng').innerText = "...";
+                document.getElementById('kb-yield').innerText = "...";
+                var pEl = document.getElementById('kb-profit'); if(pEl) pEl.innerText = "...";
+                var cEl = document.getElementById('kb-cost'); if(cEl) cEl.innerText = "...";
+                return;
+            }
+
+            var dashboardRecords = recordsData.filter(function(r) { 
+                return normalizeDate(r.date) === targetDate; 
+            });
+
+            var totalTools = dashboardRecords.length;
+
+            // 互斥且周延 (MECE) - 先精準抓出 NG，剩下的全部自動歸類為 OK (再磨)
+            var ng = dashboardRecords.filter(function(r) { 
+                var statusStr = (r.判定 || "").trim();
+                return statusStr === "退修" || statusStr === "異常" || statusStr === "NG" || (r.quantity !== "" && parseInt(r.quantity) <= CONFIG.NG_THRESHOLD); 
+            }).length;
+            
+            // 沒退修的全部算再磨，保證 2個數值總計等於回來的數量
+            var ok = totalTools - ng; 
+
+            document.getElementById('kb-total').innerText = totalTools;
+            document.getElementById('kb-ok').innerText = ok;
+            document.getElementById('kb-ng').innerText = ng;
+            document.getElementById('kb-yield').innerText = totalTools === 0 ? "0%" : Math.round((ok / totalTools) * 100) + "%";
+
+            var kbProfitEl = document.getElementById('kb-profit');
+            if(kbProfitEl) kbProfitEl.innerText = (ok * CONFIG.PROFIT_PER_OK).toLocaleString();
+            
+            var kbCostEl = document.getElementById('kb-cost');
+            if(kbCostEl) kbCostEl.innerText = (ng * CONFIG.LOSS_PER_NG).toLocaleString();
+        }
+
+        // =====================================================================
+        // AI 相機與圖片處理核心 (🌟 原封不動抗呆最穩版本)
+        // =====================================================================
+        async function handleImageUploadEvent(e) {
+            try {
+                var files = e.target.files; 
+                if (!files || files.length === 0) return;
+                var file = files[0];
+                
+                var box = document.getElementById('ocr-status-box');
+                var bar = document.getElementById('loading-bar');
+                document.getElementById('upload-zone').classList.add('border-blue-400', 'scanning');
+                
+                box.innerHTML = '<div class="flex items-center gap-3 text-blue-600"><i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> <span>正在讀取影像...</span></div>';
+                bar.style.width = '15%';
+                tempPreviewData = [];
+                lucide.createIcons();
+                
+                // 🌟 IE 優化：放寬手機相機回傳 file.type 為空的容錯判斷
+                if(file.type && !file.type.startsWith('image/')) {
+                    box.innerHTML = '<div class="flex items-center gap-2 text-red-600"><i data-lucide="x-circle" class="w-5 h-5"></i>請上傳圖片格式檔案</div>';
+                    document.getElementById('upload-zone').classList.remove('border-blue-400', 'scanning');
+                    bar.style.width = '0%';
+                    return;
+                }
+
+                var reader = new FileReader();
+                reader.onload = function(evt) {
+                    bar.style.width = '30%';
+                    box.innerHTML = '<div class="flex items-center gap-3 text-blue-600"><i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> <span>正在增強畫質並連接 AI (請勿關閉)...</span></div>';
+                    
+                    var img = new Image();
+                    img.onload = async function() {
+                        try {
+                            var canvas = document.createElement('canvas');
+                            var ctx = canvas.getContext('2d');
+                            var MAX_WIDTH = 2048; 
+                            var MAX_HEIGHT = 2048;
+                            var width = img.width;
+                            var height = img.height;
+
+                            if (width > height && width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            } else if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                            canvas.width = width;
+                            canvas.height = height;
+                            
+                            ctx.fillStyle = "white";
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 0, 0, width, height);
+
+                            var compressedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                            bar.style.width = '50%';
+
+                            await runImageOCRAnalysis(compressedDataUrl, function(extractedData) {
+                                bar.style.width = '100%';
+                                document.getElementById('upload-zone').classList.remove('border-blue-400', 'scanning');
+                                
+                                if(Array.isArray(extractedData) && extractedData.length > 0) {
+                                    extractedData.forEach(function(item) {
+                                        tempPreviewData.push({ 
+                                            id: Date.now() + Math.random(), 
+                                            date: getProductionDate(), 
+                                            tool_id: item.tool_id || "", 
+                                            quantity: item.quantity || "",
+                                            hand_sign: ""
+                                        });
+                                    });
+                                    box.innerHTML = '<div class="flex items-center gap-2 text-green-600"><i data-lucide="check-circle" class="w-5 h-5"></i>解析成功！請核對下方清單資料。</div>';
+                                } else {
+                                    box.innerHTML = '<div class="flex items-center gap-2 text-amber-600"><i data-lucide="alert-triangle" class="w-5 h-5"></i>未能辨識出數據，請重拍或手動輸入。</div>';
+                                }
+                                renderPreviewTable();
+                                document.getElementById('preview-section').classList.remove('hidden');
+                                lucide.createIcons();
+                                setTimeout(function(){ bar.style.width = '0%'; }, 1000);
+                            });
+                        } catch (imgProcessError) {
+                            box.innerHTML = '<div class="flex items-center gap-2 text-red-600"><i data-lucide="x-circle" class="w-5 h-5"></i>圖片處理失敗</div>';
+                            document.getElementById('upload-zone').classList.remove('border-blue-400', 'scanning');
+                            bar.style.width = '0%';
+                            lucide.createIcons();
+                        }
+                    };
+                    img.onerror = function() {
+                        box.innerHTML = '<div class="flex items-center gap-2 text-red-600"><i data-lucide="x-circle" class="w-5 h-5"></i>圖片解碼失敗，請重新拍攝</div>';
+                        document.getElementById('upload-zone').classList.remove('border-blue-400', 'scanning');
+                        bar.style.width = '0%';
+                        lucide.createIcons();
+                    };
+                    img.src = evt.target.result;
+                };
+                reader.onerror = function() {
+                    showToast("本機無法讀取此檔案", "error");
+                };
+                reader.readAsDataURL(file);
+            } catch (err) {
+                showToast("存取裝置檔案失敗：" + err.message, "error");
+                document.getElementById('upload-zone').classList.remove('border-blue-400', 'scanning');
+            }
+        }
+
+        async function runImageOCRAnalysis(b64, callback) {
+            try {
+                // 🌟 IE 優化：強化 Base64 解析，防止部分手機編碼異常導致崩潰
+                var mime = "image/jpeg";
+                var data = b64;
+                if(b64.includes(',')) {
+                    var parts = b64.split(',');
+                    var mimeMatch = parts[0].match(/:(.*?);/);
+                    if(mimeMatch) mime = mimeMatch[1];
+                    data = parts[1];
+                }
+                
+                var prompt = `你是一個專業的 CNC 工廠數據讀取 AI。請仔細讀取圖片「出廠憑單」中「備註」欄位的「刀號」與「拉削數量」。
+這是一張包含多筆資料的長表格，請你務必「從第一筆掃描到最後一筆」，絕對不可以提早結束或遺漏任何一列！
+
+**重要讀取邏輯（請務必嚴格遵守）：**
+1. 完整刀號格式通常為「母號-子號」，例如「130912041-5」，後面空格跟著數量「100」。
+2. 省略符號邏輯：如果新的一行開頭只有「-7 400」或「-10 400」，這代表省略了母號，請你「必須自動帶入上方最近一筆的母號」。
+   範例邏輯：
+   原始手寫: 130912041-5 100  -> 判讀結果: 刀號 130912041-5, 數量 100
+   原始手寫: -7 400           -> 判讀結果: 刀號 130912041-7, 數量 400
+   原始手寫: -10 400          -> 判讀結果: 刀號 130912041-10, 數量 400
+3. 有些項目後面可能有中文備註（如 B G40不入、= 等），請忽略這些雜訊，我只需要刀號和數量。
+4. 圖片中可能有上下兩張憑單，請將兩張憑單備註欄位中的所有刀號與數量都依序讀取出來。
+
+請直接輸出 JSON 陣列格式，不要有多餘文字或 Markdown 標籤：
+[{"tool_id": "130912041-5", "quantity": 100}, {"tool_id": "130912041-7", "quantity": 400}]`;
+                
+                var payload = {
+                    contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType: mime, data: data } }] }],
+                    generationConfig: { responseMimeType: "application/json" }
+                };
+
+                // 完整保留三個備援模型，確保網路受阻時能自動切換
+                var plans = [
+                    { model: "gemini-2.5-flash-preview-09-2025", key: apiKey },
+                    { model: "gemini-1.5-flash", key: apiKey },
+                    { model: "gemini-2.5-flash", key: apiKey }
+                ];
+
+                var result = null;
+                var lastError = null;
+
+                for (var i = 0; i < plans.length; i++) {
+                    var plan = plans[i];
+                    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + plan.model + ":generateContent?key=" + plan.key;
+                    
+                    try {
+                        var res = await fetch(url, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' }, 
+                            body: JSON.stringify(payload) 
+                        });
+                        
+                        if (res.ok) {
+                            result = await res.json();
+                            break; 
+                        } else {
+                            var errRes = await res.json();
+                            lastError = new Error(errRes.error ? errRes.error.message : "HTTP " + res.status);
+                            console.warn("模型切換 (Plan " + (i+1) + " 失敗):", lastError.message);
+                        }
+                    } catch (err) {
+                        lastError = err;
+                        console.warn("網路異常 (Plan " + (i+1) + " 失敗):", err.message);
+                    }
+                }
+
+                if (!result || !result.candidates) {
+                    throw lastError || new Error("連線皆失敗，請確認 API Key 或網路環境是否遭阻擋");
+                }
+                
+                var textData = result.candidates[0].content.parts[0].text;
+                
+                var sIdx = textData.indexOf('[');
+                var eIdx = textData.lastIndexOf(']');
+                if (sIdx !== -1 && eIdx !== -1) {
+                    textData = textData.substring(sIdx, eIdx + 1);
+                } else {
+                    textData = textData.replace(/```json/g, '').replace(/```/g, '').trim();
+                }
+                
+                var parsedData = JSON.parse(textData);
+                callback(Array.isArray(parsedData) ? parsedData : [parsedData]);
+                
+            } catch(e) { 
+                console.error("AI 錯誤:", e);
+                showToast("AI 解析或網路傳輸失敗：" + e.message, "error");
+                callback([]);
+            }
+        }
+
+        function renderPreviewTable() {
+            var tbody = document.getElementById('preview-table-body'); tbody.innerHTML = "";
+            tempPreviewData.forEach(function(item, idx) {
+                var isNgClass = (item.quantity && parseInt(item.quantity) <= CONFIG.NG_THRESHOLD) ? "text-red-600 bg-red-50 border-red-300" : "text-blue-700 bg-slate-50 border-slate-300";
+                var rowHTML = "<tr class='hover:bg-slate-50 transition-colors'>" +
+                    "<td class='p-4 text-center font-black text-slate-400'>" + (idx + 1) + "</td>" +
+                    "<td class='p-4'><input type='text' value='" + item.tool_id + "' oninput='tempPreviewData[" + idx + "].tool_id=this.value' class='w-full border border-slate-300 p-3 rounded-lg font-black text-slate-700 focus:ring-2 focus:ring-blue-500 shadow-inner' placeholder='請輸入刀號'></td>" +
+                    "<td class='p-4'><input type='number' value='" + item.quantity + "' oninput='tempPreviewData[" + idx + "].quantity=this.value; renderPreviewTable();' class='w-full border p-3 rounded-lg font-black shadow-inner focus:ring-2 focus:ring-blue-500 " + isNgClass + "' placeholder='拉削數量'></td>" +
+                    "<td class='p-4 text-center'><button onclick='deletePreviewRow(" + idx + ")' class='text-slate-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-lg transition-all'><i data-lucide='trash-2' class='w-5 h-5'></i></button></td>" + "</tr>";
+                tbody.innerHTML += rowHTML;
+            }); lucide.createIcons();
+        }
+
+        function deletePreviewRow(index) { tempPreviewData.splice(index, 1); renderPreviewTable(); }
+        function addNewRowToPreview() { tempPreviewData.push({ id: Date.now(), date: getProductionDate(), tool_id: "", quantity: "", hand_sign: "" }); renderPreviewTable(); document.getElementById('preview-section').classList.remove('hidden'); }
+
+        function executeJudgment() {
+            if(tempPreviewData.length === 0) return showToast("清單目前為空", "error");
+            
+            for(var i=0; i<tempPreviewData.length; i++) {
+                var currentToolId = (tempPreviewData[i].tool_id || "").trim();
+                if(!currentToolId) return showToast("第 "+(i+1)+" 列請確實填寫刀號", "error");
+                if(!tempPreviewData[i].quantity) return showToast("第 "+(i+1)+" 列請確實填寫數量", "error");
+
+                // 防呆：檢查今日是否已存在
+                var isDuplicate = recordsData.some(function(r) { return normalizeDate(r.date) === getProductionDate() && (r.tool_id || "").trim() === currentToolId; });
+                if(isDuplicate) {
+                    if(currentRole === "admin") { showToast("【主管權限】已允許重複添加刀號：" + currentToolId, "info"); } 
+                    else { return showToast("🚨 防呆觸發：今日已存在刀號「" + currentToolId + "」！如需重複請找主管。", "error"); }
+                }
+            }
+            
+            while(tempPreviewData.length > 0) {
+                var item = tempPreviewData[0];
+                if(parseInt(item.quantity) <= CONFIG.NG_THRESHOLD) { openRepairModal(item); return; }
+                
+                item.判定 = "再磨"; item.退修原因 = "-"; item.研磨人 = "系統判定(OK)"; item.operator = loggedInUserName; item.其他紀錄 = "-"; item.處理人簽名 = "正常放行"; item.hand_sign = ""; item.備註 = ""; 
+                saveRecord(item); tempPreviewData.shift(); renderPreviewTable();
+            }
+            document.getElementById('preview-section').classList.add('hidden'); showToast("✅ OK 刀具判定完成並已入庫！", "success");
+        }
+
+        function openRepairModal(item) {
+            document.getElementById('repair-tool-id').value = item.tool_id; document.getElementById('repair-quantity').value = item.quantity;
+            document.getElementById('repair-grinder').value = ""; document.getElementById('repair-reason').value = ""; document.getElementById('repair-notes').value = "";
+            if(currentRole !== "admin") { document.getElementById('repair-extra-fields').classList.add('hidden'); } else { document.getElementById('repair-extra-fields').classList.remove('hidden'); }
+            document.getElementById('repair-modal').classList.remove('hidden'); clearSignature();
+        }
+        function closeRepairModal() { document.getElementById('repair-modal').classList.add('hidden'); }
+
+        function submitRepairForm() {
+            var grinder = document.getElementById('repair-grinder').value, reason = document.getElementById('repair-reason').value, notes = document.getElementById('repair-notes').value;
+            if(!grinder) return showToast("請選擇前次研磨人！", "error"); if(!reason) return showToast("請選擇異常選項！", "error");
+            
+            var itemToSave = tempPreviewData[0];
+            itemToSave.判定 = "退修"; itemToSave.退修原因 = reason; itemToSave.研磨人 = grinder; itemToSave.operator = loggedInUserName; itemToSave.hand_sign = ""; itemToSave.備註 = ""; 
+            
+            if(currentRole === "admin") {
+                if(!hasSigned) return showToast("主管登錄請親筆簽名放行！", "error");
+                itemToSave.其他紀錄 = notes || "無對策說明"; itemToSave.處理人簽名 = loggedInUserName + " (主管)";
+            } else { itemToSave.其他紀錄 = "等候主管安排"; itemToSave.處理人簽名 = "待處理"; }
+            
+            saveRecord(itemToSave); closeRepairModal(); tempPreviewData.shift(); renderPreviewTable();
+            if(tempPreviewData.length > 0) executeJudgment(); else { document.getElementById('preview-section').classList.add('hidden'); showToast("🚨 退修單已記錄", "success"); }
+        }
+
+        function saveRecord(record) {
+            recordsData.unshift(record); recordsData = sortRecordsData(recordsData);
+            localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(recordsData));
+            updateDashboardUI(false); renderTableUI(); queueSyncToCloud(record); 
+            if(currentRole === "admin") updateAdminChart(); 
+        }
+
+        // =====================================================================
+        // 🌟 終極殺手鐧：解決「隊列遺失」的平行併發上傳技術
+        // =====================================================================
+        var syncQueue = []; 
+        var isSyncing = false;
+
+        function queueSyncToCloud(record) { 
+            syncQueue.push(record); 
+            processSyncQueue(); 
+        }
+
+        function processSyncQueue() {
+            if (isSyncing || syncQueue.length === 0) return;
+            if (!CONFIG.GAS_URL) return;
+            isSyncing = true; 
+
+            var statusEl = document.getElementById('login-status-indicator'); 
+            var originalHTML = statusEl.innerHTML;
+            statusEl.innerHTML = '<span class="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-spin"></span><span class="font-medium text-yellow-200">上傳雲端中...</span>';
+
+            // 🌟 IE 優化：將隊列中「所有的」資料一次性平行射出，秒殺過去會卡 7 秒的塞車問題，徹底防止關閉網頁造成的遺失！
+            var queueSnapshot = [...syncQueue];
+            syncQueue = []; // 瞬間清空列隊
+
+            var promises = queueSnapshot.map(function(record) {
+                var fd = new URLSearchParams();
+                fd.append('date', normalizeDate(record.date)); 
+                fd.append('tool_id', record.tool_id || ""); 
+                fd.append('quantity', record.quantity || "");
+                fd.append('grinder', record.研磨人 || ""); 
+                fd.append('reason', record.退修原因 || ""); 
+                fd.append('signature', record.處理人簽名 || "-");
+                fd.append('operator', record.operator || ""); 
+                fd.append('notes', record.其他紀錄 || ""); 
+                fd.append('hand_sign', ""); 
+
+                return fetch(CONFIG.GAS_URL, { method: 'POST', mode: 'no-cors', body: fd });
+            });
+
+            Promise.all(promises).then(function() { 
+                setTimeout(function() { 
+                    statusEl.innerHTML = originalHTML; 
+                    isSyncing = false; 
+                    if(syncQueue.length > 0) processSyncQueue(); 
+                }, 500); // 縮短至0.5秒，僅作為視覺緩衝
+            }).catch(function(e) { 
+                statusEl.innerHTML = originalHTML; 
+                isSyncing = false; 
+                if(syncQueue.length > 0) processSyncQueue(); 
+            });
+        }
+
+        function renderTableUI() {
+            var tbody = document.getElementById('db-table-body');
+            var search = document.getElementById('search-tool-input').value.toLowerCase(); var filter = document.getElementById('filter-status-input').value;
+            tbody.innerHTML = "";
+            
+            var filtered = recordsData.filter(function(r) { return (r.tool_id || "").toLowerCase().includes(search) && (filter === "" || r.判定 === filter); });
+
+            filtered.forEach(function(r, idx) {
+                var isNg = r.判定 === '退修' || r.判定 === 'NG' || r.判定 === '異常' || (r.quantity !== "" && parseInt(r.quantity) <= CONFIG.NG_THRESHOLD);
+                var displayStatus = isNg ? '退修(NG)' : (r.判定 === '-' ? '再磨' : r.判定);
+                
+                var statusHTML = isNg 
+                    ? `<div class="flex flex-col gap-1.5 items-start"><span class="inline-block px-2.5 py-1 bg-red-600 text-white rounded-md text-xs font-black shadow-sm tracking-widest">${displayStatus}</span><span class="text-red-700 font-black text-[12px] bg-red-50 px-2 py-1 rounded border border-red-500 shadow-sm whitespace-nowrap flex items-center gap-1"><svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>原因：${(r.退修原因 && r.退修原因 !== '-') ? r.退修原因 : '未填寫(防呆)'}</span></div>`
+                    : `<span class="px-2.5 py-1 bg-green-100 text-green-800 rounded-md text-[11px] font-black border border-green-300 shadow-sm">${displayStatus}</span>`;
+                
+                var processorClass = r.處理人簽名 === "待處理" ? "text-red-500 font-black animate-pulse" : (isNg ? "text-slate-800 font-bold" : "text-slate-700 font-bold");
+                var trClass = isNg ? "bg-red-50 hover:bg-red-100 transition-colors border-b border-red-200" : "hover:bg-blue-50/50 transition-colors border-b border-slate-100 bg-white";
+                
+                // 🌟 統計歷史再磨次數
+                var historyCount = recordsData.filter(function(record) { return (record.tool_id || "").trim() === (r.tool_id || "").trim(); }).length;
+                var toolIdDisplay = (r.tool_id || "") + "<div class='mt-1'><span class='inline-block bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm border border-blue-200'><i data-lucide='rotate-cw' class='w-3 h-3 inline mr-0.5'></i>歷史再磨: " + historyCount + " 次</span></div>";
+
+                var row = "<tr class='" + trClass + "'>" +
+                    "<td class='p-3 text-center text-slate-400 font-bold'>" + (idx + 1) + "</td>" +
+                    "<td class='p-3 font-medium text-slate-600'>" + normalizeDate(r.date) + "</td>" +
+                    "<td class='p-3 font-black " + (isNg ? "text-red-600" : "text-yellow-600") + " tracking-wider text-sm'>" + toolIdDisplay + "</td>" +
+                    "<td class='p-3 font-black text-lg " + (isNg ? "text-red-600" : "text-slate-700") + "'>" + (r.quantity || "") + "</td>" +
+                    "<td class='p-3 font-bold text-slate-700'>" + (r.研磨人 || '-') + "</td>" +
+                    "<td class='p-3'>" + statusHTML + "</td>" +
+                    "<td class='p-3 text-xs'><div class='" + processorClass + "'>" + (r.處理人簽名 || '-') + "</div><div class='text-[10px] text-slate-500 mt-0.5'>" + (r.其他紀錄 || '-') + "</div></td>" +
+                    "<td class='p-3 font-bold text-emerald-600'>" + (r.operator || '-') + "</td>" +
+                    "<td class='p-3 font-medium text-gray-500'>" + (r.備註 || "") + "</td>" +
+                    "<td class='p-3 border-l border-slate-200'><div class='w-full h-8 border border-dashed border-slate-300 rounded bg-white/50'></div></td>" + 
+                    "<td class='p-3 text-center'>" +
+                        "<div class='flex justify-center items-center gap-1'>" +
+                            (currentRole === 'admin' ? "<button onclick='openEditModal(\"" + r.id + "\")' class='text-slate-400 hover:text-white hover:bg-blue-500 p-1.5 rounded-lg transition-all shadow-sm' title='修改'><i data-lucide='edit-3' class='w-4 h-4'></i></button>" : "") +
+                            "<button onclick='openConfirmModal(\"" + r.id + "\")' class='text-slate-400 hover:text-white hover:bg-red-500 p-1.5 rounded-lg transition-all shadow-sm' title='刪除'><i data-lucide='trash-2' class='w-4 h-4'></i></button>" +
+                        "</div>" +
+                    "</td>" + "</tr>";
+                tbody.innerHTML += row;
+            }); try { lucide.createIcons(); } catch(e) {}
+        }
+
+        function openConfirmModal(id) {
+            if(currentRole !== "admin") { showToast("僅限主管密碼可刪除紀錄！", "error"); return; }
+            recordIdToDelete = id; document.getElementById('custom-confirm-modal').classList.remove('hidden'); document.getElementById('custom-confirm-modal').classList.add('flex');
+            document.getElementById('confirm-delete-btn').onclick = function() {
+                if (recordIdToDelete) {
+                    recordsData = recordsData.filter(function(r) { return r.id.toString() !== recordIdToDelete.toString(); });
+                    localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(recordsData));
+                    updateDashboardUI(false); renderTableUI(); if(currentRole === "admin") updateAdminChart();
+                    showToast("資料已強制刪除", "success");
+                } closeConfirmModal();
+            };
+        }
+        function closeConfirmModal() { document.getElementById('custom-confirm-modal').classList.add('hidden'); document.getElementById('custom-confirm-modal').classList.remove('flex'); recordIdToDelete = null; }
+
+        var recordIdToEdit = null;
+        function openEditModal(id) {
+            if(currentRole !== "admin") { showToast("僅限主管可修改紀錄！", "error"); return; }
+            var target = recordsData.find(function(r) { return r.id.toString() === id.toString(); }); if(!target) return;
+            recordIdToEdit = id;
+            document.getElementById('edit-tool-id').value = target.tool_id || ""; document.getElementById('edit-quantity').value = target.quantity || "";
+            document.getElementById('edit-grinder').value = target.研磨人 === "系統判定(OK)" ? "" : (target.研磨人 || ""); document.getElementById('edit-notes').value = target.其他紀錄 || "";
+            document.getElementById('edit-modal').classList.remove('hidden');
+        }
+        function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); recordIdToEdit = null; }
+
+        function submitEditRecord() {
+            if(!recordIdToEdit) return;
+            var targetIndex = recordsData.findIndex(function(r) { return r.id.toString() === recordIdToEdit.toString(); }); if(targetIndex === -1) return;
+            var newToolId = document.getElementById('edit-tool-id').value.trim(), newQty = document.getElementById('edit-quantity').value, newGrinder = document.getElementById('edit-grinder').value.trim(), newNotes = document.getElementById('edit-notes').value.trim();
+            if(!newToolId || !newQty) { showToast("刀號與數量不可為空！", "error"); return; }
+
+            recordsData[targetIndex].tool_id = newToolId; recordsData[targetIndex].quantity = newQty;
+            recordsData[targetIndex].研磨人 = (recordsData[targetIndex].判定 === "再磨" && !newGrinder) ? "系統判定(OK)" : (newGrinder || "-");
+            recordsData[targetIndex].其他紀錄 = newNotes || "-";
+
+            localStorage.setItem(LOCAL_DB_KEY, JSON.stringify(recordsData));
+            updateDashboardUI(false); renderTableUI(); if(currentRole === "admin") updateAdminChart();
+            queueSyncToCloud(recordsData[targetIndex]); // 修改後覆寫雲端
+            closeEditModal(); showToast("✅ 資料已修正並準備覆蓋雲端！", "success");
+        }
+
+        // =====================================================================
+        // CSV 及 簽名板核心 (完全不動)
+        // =====================================================================
+        function initSignaturePad() {
+            sigCanvas = document.getElementById('signature-canvas'); if (!sigCanvas) return; sigCtx = sigCanvas.getContext('2d');
+            function resetCanvas() { var rect = sigCanvas.getBoundingClientRect(); sigCanvas.width = rect.width; sigCanvas.height = rect.height; clearSignature(); }
+            window.addEventListener('resize', resetCanvas); resetCanvas();
+            function getPos(e) { var rect = sigCanvas.getBoundingClientRect(); var cx = e.touches ? e.touches[0].clientX : e.clientX; var cy = e.touches ? e.touches[0].clientY : e.clientY; return { x: (cx - rect.left), y: (cy - rect.top) }; }
+            function start(e) { isDrawing = true; hasSigned = true; var p = getPos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y); sigCtx.lineWidth = 4; sigCtx.strokeStyle = "#1e3a8a"; sigCtx.lineCap = 'round'; document.getElementById('signature-placeholder').classList.add('hidden'); }
+            function draw(e) { if(!isDrawing) return; var p = getPos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); }
+            function end() { isDrawing = false; }
+            sigCanvas.addEventListener('mousedown', start); sigCanvas.addEventListener('mousemove', draw); window.addEventListener('mouseup', end);
+            sigCanvas.addEventListener('touchstart', function(e) { e.preventDefault(); start(e); }, {passive: false}); sigCanvas.addEventListener('touchmove', function(e) { e.preventDefault(); draw(e); }, {passive: false}); sigCanvas.addEventListener('touchend', end);
+        }
+        function clearSignature() { if(!sigCtx) return; sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height); hasSigned = false; document.getElementById('signature-placeholder').classList.remove('hidden'); }
+
+        function showToast(msg, type) {
+            type = type || "info"; var toast = document.createElement('div');
+            var bgClass = type === "success" ? "bg-green-600" : (type === "error" ? "bg-red-600" : "bg-slate-800");
+            var icon = type === "success" ? "check-circle" : (type === "error" ? "alert-triangle" : "info");
+            toast.className = bgClass + " text-white px-5 py-3.5 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] transform translate-y-10 opacity-0 transition-all duration-300 font-bold flex items-center gap-3 z-[9999]";
+            toast.innerHTML = "<i data-lucide='" + icon + "' class='w-5 h-5'></i> <span>" + msg + "</span>";
+            document.getElementById('toast-container').appendChild(toast); lucide.createIcons();
+            setTimeout(function() { toast.classList.remove('translate-y-10', 'opacity-0'); }, 10);
+            setTimeout(function() { toast.classList.add('opacity-0', 'translate-y-2'); setTimeout(function() { if(toast.parentNode) toast.parentNode.removeChild(toast); }, 300); }, 5000); 
+        }
+    </script>
+</body>
+</html>
